@@ -5,15 +5,12 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-
-	"github.com/dlion/goimgur"
 )
 
 var addr = flag.String("addr", ":8080", "http service address")
@@ -22,38 +19,11 @@ var ipaddress string
 // 1MB
 const MAX_MEMORY = 1 * 1024 * 1024
 
-type img_info struct {
-	Id          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-}
-
-type resp struct {
-	Data *img_info `json:"data"`
-}
-
-func upload_to_imgur(filepath string) (url_path string) {
-	str, err := goImgur.Upload(filepath, "8f4bb2ff3d41947")
-	if err != nil {
-		log.Panic(err)
-	}
-	fmt.Println(*str)
-
-	byte_resp := []byte(*str)
-	r := &resp{}
-	json.Unmarshal(byte_resp, r)
-	url_path = "https://www.imgur.com/" + r.Data.Id
-	return url_path
-
-}
-
 func upload(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_MEMORY); err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusForbidden)
 	}
-
-	url := ""
 
 	for _, fileHeaders := range r.MultipartForm.File {
 		for _, fileHeader := range fileHeaders {
@@ -70,9 +40,8 @@ func upload(w http.ResponseWriter, r *http.Request) {
 			buf, _ := ioutil.ReadAll(file)
 			path = "files/" + path
 			ioutil.WriteFile(path, buf, os.ModePerm)
-			url = upload_to_imgur(path)
 
-			fmt.Fprintf(w, "URL: %s/%s %s %s %s", ipaddress, path, "\n", "IMGUR: ", url)
+			fmt.Fprintf(w, "URL: %s/%s %s", ipaddress, path, "\n")
 		}
 	}
 
