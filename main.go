@@ -17,7 +17,7 @@ var addr = flag.String("addr", ":8080", "http service address")
 var ipaddress string
 
 // 1MB
-const MAX_MEMORY = 1 * 1024 * 1024
+const MAX_MEMORY = 10 * 1024 * 1024
 
 func upload(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_MEMORY); err != nil {
