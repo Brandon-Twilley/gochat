@@ -17,6 +17,7 @@ import (
 )
 
 var addr = flag.String("addr", ":8080", "http service address")
+var ipaddress string
 
 // 1MB
 const MAX_MEMORY = 1 * 1024 * 1024
@@ -71,7 +72,7 @@ func upload(w http.ResponseWriter, r *http.Request) {
 			ioutil.WriteFile(path, buf, os.ModePerm)
 			url = upload_to_imgur(path)
 
-			fmt.Fprintf(w, "URL: %s %s", url, "\n")
+			fmt.Fprintf(w, "URL: %s/%s %s %s %s", ipaddress, path, "\n", "IMGUR: ", url)
 		}
 	}
 
@@ -92,6 +93,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
+	ipaddress = "192.168.43.203:8080"
 	gucci = "\n\n########__########_########_########_########_########_\n##_____##_##_______##_______##_______##_______##\n##_____##_##_______##_______##_______##_______##\n########__######___######___######___######___######\n##___##___##_______##_______##_______##_______##\n##____##__##_______##_______##_______##_______##\n##_____##_########_########_########_########_########"
 
 	mod_bot = "HAL_5000-BOT"
@@ -99,6 +101,10 @@ func main() {
 	hub := newHub()
 	go hub.run()
 	http.HandleFunc("/upload", upload)
+
+	http.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, r.URL.Path[1:])
+	})
 
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
