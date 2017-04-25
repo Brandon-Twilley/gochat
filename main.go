@@ -1,7 +1,3 @@
-// Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
 package main
 
 import (
@@ -12,12 +8,13 @@ import (
 	"net/http"
 	"os"
 	"net"
+	"strings"
 )
 
 var addr = flag.String("addr", ":8080", "http service address")
 var ipaddress string
 
-// 1MB
+// 10 MB
 const MAX_MEMORY = 10 * 1024 * 1024
 
 func GetLocalIP() string {
@@ -87,6 +84,10 @@ func main() {
 	http.HandleFunc("/upload", upload)
 
 	http.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/") {
+			http.NotFound(w,r)
+			return			
+		}
 		http.ServeFile(w, r, r.URL.Path[1:])
 	})
 
