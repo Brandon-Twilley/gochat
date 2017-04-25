@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"net"
 )
 
 var addr = flag.String("addr", ":8080", "http service address")
@@ -18,6 +19,25 @@ var ipaddress string
 
 // 1MB
 const MAX_MEMORY = 10 * 1024 * 1024
+
+func GetLocalIP() string {
+    addrs, err := net.InterfaceAddrs()
+    if err != nil {
+        return ""
+    }
+    for _, address := range addrs {
+        // check the address type and if it is not a loopback the 
+display it
+        if ipnet, ok := address.(*net.IPNet); ok && 
+!ipnet.IP.IsLoopback() {
+            if ipnet.IP.To4() != nil {
+                return ipnet.IP.String()
+            }
+        }
+    }
+    return ""
+}
+
 
 func upload(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_MEMORY); err != nil {
@@ -62,7 +82,9 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	ipaddress = "192.168.43.203:8080"
+	ipaddress = GetLocalIP();
+
+
 	gucci = "\n\n########__########_########_########_########_########_\n##_____##_##_______##_______##_______##_______##\n##_____##_##_______##_______##_______##_______##\n########__######___######___######___######___######\n##___##___##_______##_______##_______##_______##\n##____##__##_______##_______##_______##_______##\n##_____##_########_########_########_########_########"
 
 	mod_bot = "HAL_5000-BOT"
