@@ -47,11 +47,6 @@ func upload(w http.ResponseWriter, r *http.Request) {
 		for _, fileHeader := range fileHeaders {
 			file, _ := fileHeader.Open()
 
-			/*
-				TODO: IMPORTANT!!! Change this directory below when you start a server.
-				This should point to your home directory with the subdirectory of your
-				file.
-			*/
 
 			path := fmt.Sprintf(fileHeader.Filename)
 			fmt.Println(path)
@@ -59,7 +54,7 @@ func upload(w http.ResponseWriter, r *http.Request) {
 			path = "files/" + path
 			ioutil.WriteFile(path, buf, os.ModePerm)
 
-			fmt.Fprintf(w, "URL: %s/%s %s", ipaddress, path, "\n")
+			fmt.Fprintf(w, "URL: %s:8080/%s %s", ipaddress, path, "\n")
 		}
 	}
 
