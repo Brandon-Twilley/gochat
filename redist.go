@@ -65,7 +65,7 @@ func (redis *redist) run() {
 
 			} else if (is_unicast) {
 				for cli := range redis.clients {	//SEND ONLY TO THE RECIPIENT AND THE SENDER
-					if ((strings.Compare(cli.name,recipient) == 0) || (strings.Compare(client.name,sender) == 0)) {
+					if ((strings.Compare(cli.name,recipient) == 0) || (strings.Compare(cli.name,sender) == 0)) {
 						select {
 						case cli.send <- message:
 						default:
