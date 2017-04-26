@@ -12,12 +12,12 @@ golang websocket (github.com/gorilla/websocket)
 
 golang mux (github.com/gorilla/mux)
 
-**To aquire these: **
+**To aquire these:**
 `go get github.com/gorilla/mux`
 `go get github.com/gorilla/websocket`
 
 
-*Instructions for hosting web server: *
+*Instructions for hosting web server:*
 1. Choose a file directory to host your webserver.
 2. Once you’ve picked a directory, upload your client.go, hub.go, main.go, and home.html into your directory and create a directory called files/ but leave empty.  This will be used to host the files uploaded.
 3. Once this is uploaded, if you haven’t installed golang, and the additional package, do that already.  Once installed, run ‘go run client.go hub.go main.go’.  Your webserver should now be running on port 8080 by default.
