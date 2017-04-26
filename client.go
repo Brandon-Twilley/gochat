@@ -39,7 +39,7 @@ var upgrader = websocket.Upgrader{
 
 // Client is a middleman between the websocket connection and the hub.
 type Client struct {
-	hub *Hub
+	r *redist
 
 	// The websocket connection.
 	conn *websocket.Conn
@@ -135,20 +135,20 @@ func irccall(m *msg, c *Client) {
 	return
 }
 
-func (c *Client) readPump() {
+func (cli *Client) readPump() {
 	defer func() {
-		c.hub.unregister <- c
-		c.conn.Close()
+		cli.r.leaving_client <- cli
+		cli.conn.Close()
 	}()
-	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	cli.conn.SetReadLimit(maxMessageSize)
+	cli.conn.SetReadDeadline(time.Now().Add(pongWait))
+	cli.conn.SetPongHandler(func(string) error { cli.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		_, message, err := c.conn.ReadMessage()
-		m := &msg{User:c.name, Text:string(message)}
+		_, message, err := cli.conn.ReadMessage()
+		m := &msg{User:cli.name, Text:string(message)}
 
 		if message[0] == '/' {
-			irccall(m,c)
+			irccall(m,cli)
 		}
 		str_message, err := json.Marshal(m)
 
@@ -160,33 +160,31 @@ func (c *Client) readPump() {
 		}
 		message = str_message
 		fmt.Println(string(message))
-		c.hub.broadcast <- message
+		cli.r.broadcast <- message
 	}
 }
 
-// writePump pumps messages from the hub to the websocket connection.
-//
-// A goroutine running writePump is started for each connection. The
-// application ensures that there is at most one writer to a connection by
-// executing all writes from this goroutine.
-func (c *Client) writePump() {
+// 	Each instance of this function is running for all clients connected
+// 	to the webserver.  This is the function that sends it to our recipient
+// 	client
+func (cli *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		cli.conn.Close()
 	}()
 
 	for {
 		select {
-		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		case message, ok := <-cli.send:
+			cli.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				cli.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			w, err := c.conn.NextWriter(websocket.TextMessage)
+			w, err := cli.conn.NextWriter(websocket.TextMessage)
 
 			if err != nil {
 				return
@@ -195,34 +193,47 @@ func (c *Client) writePump() {
 			w.Write(message)
 
 		// Add queued chat messages to the current websocket message.
-			n := len(c.send)
+			n := len(cli.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
-				w.Write(<-c.send)
+				w.Write(<-cli.send)
 			}
 
 			if err := w.Close(); err != nil {
 				return
 			}
+				//constantly pings our client to see if there still exists a connection.
+				//if there exists no connection, terminate.
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+			cli.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := cli.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}
 		}
 	}
 }
 
-// serveWs handles websocket requests from the peer.
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+// websox handles websocket requests from the peer.
+func websox(red *redist, w http.ResponseWriter, r *http.Request) {
+
+		// this gives back the client a specific socket to run on.
 	conn, err := upgrader.Upgrade(w, r, nil)
+
+
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
-	client.name = client.conn.RemoteAddr().String()
-	client.hub.register <- client
-	go client.writePump()
-	client.readPump()
+		//	we create the client datatype to keep track of all our clients in
+		//	the system and store it in a map datatype.  This is so we can
+		//	propagate all our messages through to every client that's a recipient
+	c := &Client{r: red, conn: conn, send: make(chan []byte, 256)}
+		//	the initial name of our client is their IP address and socket.
+		//	They can change this if they use the /nick command.
+	c.name = c.conn.RemoteAddr().String()
+
+
+	c.r.new_client <- c
+	go c.writePump()
+	c.readPump()
 }

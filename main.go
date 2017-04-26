@@ -77,12 +77,21 @@ func main() {
 
 	gucci = "\n\n########__########_########_########_########_########_\n##_____##_##_______##_______##_______##_______##\n##_____##_##_______##_______##_______##_______##\n########__######___######___######___######___######\n##___##___##_______##_______##_______##_______##\n##____##__##_______##_______##_______##_______##\n##_____##_########_########_########_########_########"
 
-	mod_bot = "HAL_5000-BOT"
 	flag.Parse()
-	hub := newHub()
-	go hub.run()
+	red := newRedist()
+	go red.run()
+		/*  "/upload" tells us where our file was uploaded.  This URL can only be viewed
+		  	by the person that uploaded the document.  From there, they can choose to
+		 	forward the URL to any other user using the client.
+		 */
 	http.HandleFunc("/upload", upload)
 
+		/*
+			/files/ holds the documents that have been uploaded by the user.  This is held
+			in a subdirectory of the root server by the same name.  If anyone tries to access
+			localhost:8080/files, they are returned with a 404 error.  This prevents people
+			from looking at all the contents stored in the /file/ subdirectory of our webserver.
+		*/
 	http.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") {
 			http.NotFound(w,r)
@@ -90,10 +99,15 @@ func main() {
 		}
 		http.ServeFile(w, r, r.URL.Path[1:])
 	})
-
+		/*
+			This is the root directory of the main webserver.  This loads up the homepage for our
+			client.  From here, the /ws deals with communications between our sockets on our client
+			javascript functions and the sockets on our server.  The ws handlefunc deals with most of
+			the networking in the system (in the serveWs function).
+		*/
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+		websox(red, w, r)
 	})
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
