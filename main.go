@@ -5,34 +5,33 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
-	"net"
 	"strings"
 )
 
-var addr = flag.String("addr", ":8080", "http service address")
+var addr = flag.String("addr", ":8000", "http service address")
 var ipaddress string
 
 // 10 MB
 const MAX_MEMORY = 10 * 1024 * 1024
 
 func GetLocalIP() string {
-    addrs, err := net.InterfaceAddrs()
-    if err != nil {
-        return ""
-    }
-    for _, address := range addrs {
-        // check the address type and if it is not a loopback the display it
-        if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-            if ipnet.IP.To4() != nil {
-                return ipnet.IP.String()
-            }
-        }
-    }
-    return ""
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, address := range addrs {
+		// check the address type and if it is not a loopback the display it
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
 }
-
 
 func upload(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(MAX_MEMORY); err != nil {
@@ -43,7 +42,6 @@ func upload(w http.ResponseWriter, r *http.Request) {
 	for _, fileHeaders := range r.MultipartForm.File {
 		for _, fileHeader := range fileHeaders {
 			file, _ := fileHeader.Open()
-
 
 			path := fmt.Sprintf(fileHeader.Filename)
 			fmt.Println(path)
@@ -67,44 +65,43 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", 405)
 		return
 	}
-	http.ServeFile(w, r, "home.html")
+	http.ServeFile(w, r, "index.html")
 }
 
 func main() {
 
-	ipaddress = GetLocalIP();
-
+	ipaddress = GetLocalIP()
 
 	gucci = "\n\n########__########_########_########_########_########_\n##_____##_##_______##_______##_______##_______##\n##_____##_##_______##_______##_______##_______##\n########__######___######___######___######___######\n##___##___##_______##_______##_______##_______##\n##____##__##_______##_______##_______##_______##\n##_____##_########_########_########_########_########"
 
 	flag.Parse()
 	red := newRedist()
 	go red.run()
-		/*  "/upload" tells us where our file was uploaded.  This URL can only be viewed
-		  	by the person that uploaded the document.  From there, they can choose to
-		 	forward the URL to any other user using the client.
-		 */
+	/*  "/upload" tells us where our file was uploaded.  This URL can only be viewed
+	 	by the person that uploaded the document.  From there, they can choose to
+		forward the URL to any other user using the client.
+	*/
 	http.HandleFunc("/upload", upload)
 
-		/*
-			/files/ holds the documents that have been uploaded by the user.  This is held
-			in a subdirectory of the root server by the same name.  If anyone tries to access
-			localhost:8080/files, they are returned with a 404 error.  This prevents people
-			from looking at all the contents stored in the /file/ subdirectory of our webserver.
-		*/
+	/*
+		/files/ holds the documents that have been uploaded by the user.  This is held
+		in a subdirectory of the root server by the same name.  If anyone tries to access
+		localhost:8080/files, they are returned with a 404 error.  This prevents people
+		from looking at all the contents stored in the /file/ subdirectory of our webserver.
+	*/
 	http.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/") {
-			http.NotFound(w,r)
-			return			
+			http.NotFound(w, r)
+			return
 		}
 		http.ServeFile(w, r, r.URL.Path[1:])
 	})
-		/*
-			This is the root directory of the main webserver.  This loads up the homepage for our
-			client.  From here, the /ws deals with communications between our sockets on our client
-			javascript functions and the sockets on our server.  The ws handlefunc deals with most of
-			the networking in the system (in the serveWs function).
-		*/
+	/*
+		This is the root directory of the main webserver.  This loads up the homepage for our
+		client.  From here, the /ws deals with communications between our sockets on our client
+		javascript functions and the sockets on our server.  The ws handlefunc deals with most of
+		the networking in the system (in the serveWs function).
+	*/
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		websox(red, w, r)

@@ -1,6 +1,7 @@
-
 package main
+
 import (
+	"fmt"
 	"strings"
 )
 
@@ -10,16 +11,13 @@ import (
 	everyone who it belongs to.
 */
 
-
 func newRedist() *redist {
 	return &redist{
-		new_client:   make(chan *Client),
+		new_client: make(chan *Client),
 		broadcast:  make(chan []byte),
 
 		leaving_client: make(chan *Client),
-		clients:    make(map[*Client]bool),
-
-
+		clients:        make(map[*Client]bool),
 	}
 }
 
@@ -36,67 +34,50 @@ type redist struct {
 
 	// Unregister requests from clients.
 	leaving_client chan *Client
-
 }
 
 func (redis *redist) run() {
 
-	for {
+	for true {
 		select {
 		case cli := <-redis.new_client:
 			redis.clients[cli] = true
 		case cli := <-redis.leaving_client:
-			if _, ok := redis.clients[cli]; ok {
+			_, notalive := redis.clients[cli]
+			if notalive {
+				fmt.Println("CLIENT " + cli.name + " LEFT")
 				delete(redis.clients, cli)
 				close(cli.send)
 			}
 		case message := <-redis.broadcast:
-
 			if is_new_name {
-
 				for cli := range redis.clients {
-					select {	// links the new client to the chat server
+					select { // links the new client to the chat server
 					case cli.send <- message:
-					default:
-						close(cli.send)
-						delete(redis.clients, cli)
 					}
 				}
-
-			} else if (is_unicast) {
-				for cli := range redis.clients {	//SEND ONLY TO THE RECIPIENT AND THE SENDER
-					if ((strings.Compare(cli.name,recipient) == 0) || (strings.Compare(cli.name,sender) == 0)) {
+			} else if is_unicast {
+				for cli := range redis.clients { //SEND ONLY TO THE RECIPIENT AND THE SENDER
+					if (strings.Compare(cli.name, recipient) == 0) || (strings.Compare(cli.name, sender) == 0) {
 						select {
 						case cli.send <- message:
-						default:
-							close(cli.send)
-							delete(redis.clients, cli)
 						}
 					}
 				}
-
-			} else if (is_blockcast) {
+			} else if is_blockcast {
 				for cli := range redis.clients { //SEND TO EVERYONE EXCEPT THE RECIPIENT
-					if ((strings.Compare(cli.name, recipient) == 0)) {
-
+					if strings.Compare(cli.name, recipient) == 0 {
 					} else {
 						select {
 						case cli.send <- message:
-						default:
-							close(cli.send)
-							delete(redis.clients, cli)
 						}
 					}
-
 				}
 
-			} else {		// TYPICAL CLIENT BROADCAST
+			} else { // TYPICAL CLIENT BROADCAST
 				for cli := range redis.clients {
 					select {
 					case cli.send <- message:
-					default:
-						close(cli.send)
-						delete(redis.clients, cli)
 					}
 				}
 			}

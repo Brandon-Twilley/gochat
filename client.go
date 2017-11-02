@@ -1,5 +1,3 @@
-
-
 package main
 
 import (
@@ -7,23 +5,24 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"encoding/json"
 	"fmt"
 	"strings"
-	"encoding/json"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
-// Time allowed to write a message to the peer.
+	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
 
-// Time allowed to read the next pong message from the peer.
+	// Time allowed to read the next pong message from the peer.
 	pongWait = 60 * time.Second
 
-// Send pings to peer with this period. Must be less than pongWait.
+	// Send pings to peer with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
 
-// Maximum message size allowed from peer.
+	// Maximum message size allowed from peer.
 	maxMessageSize = 512
 )
 
@@ -55,8 +54,8 @@ type Client struct {
 // reads from this goroutine.
 
 type msg struct {
-	User 			string 			`json:"user"`
-	Text	 		string			`json:"text"`
+	User string `json:"user"`
+	Text string `json:"text"`
 }
 
 var is_unicast bool
@@ -70,63 +69,62 @@ var gucci string
 
 func irccall(m *msg, c *Client) {
 	/*
-	Expected data formats
-	'message'                         --Broadcast text 'message, default case
-	/msg 'username' 'msg'             --Unicast text 'message' to 'username'
-	/bmsg 'username' 'msg'            --Blockcast text, send to all except 'username'
-	/bcfile 'filepath'                --Broadcast file to all users, where 'filepath' is
-			full path on localmachine
-	/ucfile 'username' 'filepath'     --Unicast file to 'username', where 'filepath' is
-			full path on localmachine
-	/nick 'username'                  --Create/reassign new user.
-	/gucci                            --Does something interesting*/
+		Expected data formats
+		'message'                         --Broadcast text 'message, default case
+		/msg 'username' 'msg'             --Unicast text 'message' to 'username'
+		/bmsg 'username' 'msg'            --Blockcast text, send to all except 'username'
+		/bcfile 'filepath'                --Broadcast file to all users, where 'filepath' is
+				full path on localmachine
+		/ucfile 'username' 'filepath'     --Unicast file to 'username', where 'filepath' is
+				full path on localmachine
+		/nick 'username'                  --Create/reassign new user.
+		/gucci                            --Does something interesting*/
 
 	partition := strings.Fields(m.Text)
-	fmt.Println("PARTITION: ",partition)
-	for i := 0;i<len(partition);i++ {
-		fmt.Println(i, " : ",partition[i])
+	fmt.Println("PARTITION: ", partition)
+	for i := 0; i < len(partition); i++ {
+		fmt.Println(i, " : ", partition[i])
 	}
-	if strings.Compare(partition[0],"/msg") == 0 {
+	if strings.Compare(partition[0], "/msg") == 0 {
 		is_unicast = true
 		is_blockcast = false
 		is_new_name = false
 		is_gucci = false
 
 		sender = m.User
-		if(len(partition) < 2) {
-			return;
+		if len(partition) < 2 {
+			return
 		}
 		recipient = partition[1]
 
-	} else if (strings.Compare(partition[0],"/bmsg")) == 0 {
+	} else if (strings.Compare(partition[0], "/bmsg")) == 0 {
 		is_unicast = false
 		is_blockcast = true
 		is_new_name = false
 		is_gucci = false
-		if(len(partition) < 2) {
-			return;
+		if len(partition) < 2 {
+			return
 		}
 		sender = m.User
 		recipient = partition[1]
-	} else if (strings.Compare(partition[0],"/nick")) == 0 {
+	} else if (strings.Compare(partition[0], "/nick")) == 0 {
 		is_unicast = false
 		is_blockcast = false
 		is_new_name = true
 		is_gucci = false
 
 		sender = m.User
-		if(len(partition) < 2) {
-			return;
+		if len(partition) < 2 {
+			return
 		}
 		m.User = partition[1]
 		c.name = partition[1]
-		fmt.Println("NEW NICKNAME: ",m.User)
-	} else if (strings.Compare(partition[0],"/gucci")) == 0 {
+		fmt.Println("NEW NICKNAME: ", m.User)
+	} else if (strings.Compare(partition[0], "/gucci")) == 0 {
 		is_unicast = false
 		is_blockcast = false
 		is_new_name = false
 		is_gucci = true
-
 
 		m.Text = gucci
 	}
@@ -140,23 +138,21 @@ func (cli *Client) readPump() {
 		cli.conn.Close()
 	}()
 	cli.conn.SetReadLimit(maxMessageSize)
-	cli.conn.SetReadDeadline(time.Now().Add(pongWait))
-	cli.conn.SetPongHandler(func(string) error { cli.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
 		_, message, err := cli.conn.ReadMessage()
-		m := &msg{User:cli.name, Text:string(message)}
-
-		if message[0] == '/' {
-			irccall(m,cli)
-		}
-		str_message, err := json.Marshal(m)
-
+		m := &msg{User: cli.name, Text: string(message)}
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
 				log.Printf("error: %v", err)
 			}
 			break
 		}
+
+		if message[0] == '/' {
+			irccall(m, cli)
+		}
+		str_message, err := json.Marshal(m)
+
 		message = str_message
 		fmt.Println(string(message))
 		cli.r.broadcast <- message
@@ -167,13 +163,12 @@ func (cli *Client) readPump() {
 // 	to the webserver.  This is the function that sends it to our recipient
 // 	client
 func (cli *Client) writePump() {
-	ticker := time.NewTicker(pingPeriod)
 	defer func() {
-		ticker.Stop()
 		cli.conn.Close()
 	}()
 
 	for {
+
 		select {
 		case message, ok := <-cli.send:
 			cli.conn.SetWriteDeadline(time.Now().Add(writeWait))
@@ -191,7 +186,7 @@ func (cli *Client) writePump() {
 
 			w.Write(message)
 
-		// Add queued chat messages to the current websocket message.
+			// Add queued chat messages to the current websocket message.
 			n := len(cli.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
@@ -201,13 +196,9 @@ func (cli *Client) writePump() {
 			if err := w.Close(); err != nil {
 				return
 			}
-		//constantly pings our client to see if there still exists a connection.
-		//if there exists no connection, terminate.
-		case <-ticker.C:
-			cli.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := cli.conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				return
-			}
+			//constantly pings our client to see if there still exists a connection.
+			//if there exists no connection, terminate.
+
 		}
 	}
 }
@@ -217,7 +208,6 @@ func websox(red *redist, w http.ResponseWriter, r *http.Request) {
 
 	// this gives back the client a specific socket to run on.
 	conn, err := upgrader.Upgrade(w, r, nil)
-
 
 	if err != nil {
 		log.Println(err)
@@ -230,7 +220,6 @@ func websox(red *redist, w http.ResponseWriter, r *http.Request) {
 	//	the initial name of our client is their IP address and socket.
 	//	They can change this if they use the /nick command.
 	c.name = c.conn.RemoteAddr().String()
-
 
 	c.r.new_client <- c
 	go c.writePump()
