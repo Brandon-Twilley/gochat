@@ -68,6 +68,16 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "index.html")
 }
 
+func serveJS(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL)
+	http.ServeFile(w, r, "javascript/jscript.js")
+}
+
+func serveStyle(w http.ResponseWriter, r *http.Request) {
+	log.Println(r.URL)
+	http.ServeFile(w, r, "style/style.css")
+}
+
 func main() {
 
 	ipaddress = GetLocalIP()
@@ -103,6 +113,8 @@ func main() {
 		the networking in the system (in the serveWs function).
 	*/
 	http.HandleFunc("/", serveHome)
+	http.HandleFunc("/javascript/jscript.js", serveJS)
+	http.HandleFunc("/style/style.css", serveStyle)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		websox(red, w, r)
 	})
