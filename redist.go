@@ -22,34 +22,34 @@ func newRedist() *redist {
 }
 
 type redist struct {
-
-	// Register requests from the clients.
-	new_client chan *Client
-
-	// Registered clients.
-	clients map[*Client]bool
-
-	// Inbound messages from the clients.
-	broadcast chan []byte
-
-	// Unregister requests from clients.
+	new_client     chan *Client
+	clients        map[*Client]bool
+	broadcast      chan []byte
 	leaving_client chan *Client
 }
+
+/*
+	redis receives 3 conditions, either a joining client, leaving client, or
+	a new message.  if its a new message using chat handles, we parse through
+	what we received and distribute the message that way.
+*/
 
 func (redis *redist) run() {
 
 	for true {
 		select {
-		case cli := <-redis.new_client:
+		// Unregister requests from clients.
+
+		case cli := <-redis.new_client: //allocates client
 			redis.clients[cli] = true
-		case cli := <-redis.leaving_client:
+		case cli := <-redis.leaving_client: //deallocates client
 			_, notalive := redis.clients[cli]
 			if notalive {
 				fmt.Println("CLIENT " + cli.name + " LEFT")
 				delete(redis.clients, cli)
 				close(cli.send)
 			}
-		case message := <-redis.broadcast:
+		case message := <-redis.broadcast: //receives message.  Parses message to send to other clients.
 			if is_new_name {
 				for cli := range redis.clients {
 					select { // links the new client to the chat server

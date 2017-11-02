@@ -49,7 +49,7 @@ func upload(w http.ResponseWriter, r *http.Request) {
 			path = "files/" + path
 			ioutil.WriteFile(path, buf, os.ModePerm)
 
-			fmt.Fprintf(w, "URL: %s:8080/%s %s", ipaddress, path, "\n")
+			fmt.Fprintf(w, "URL: %s:8000/%s %s", ipaddress, path, "\n")
 		}
 	}
 
@@ -78,6 +78,10 @@ func serveStyle(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "style/style.css")
 }
 
+/*
+	initializes file server and necessary functions
+*/
+
 func main() {
 
 	ipaddress = GetLocalIP()
@@ -96,7 +100,7 @@ func main() {
 	/*
 		/files/ holds the documents that have been uploaded by the user.  This is held
 		in a subdirectory of the root server by the same name.  If anyone tries to access
-		localhost:8080/files, they are returned with a 404 error.  This prevents people
+		localhost:8000/files, they are returned with a 404 error.  This prevents people
 		from looking at all the contents stored in the /file/ subdirectory of our webserver.
 	*/
 	http.HandleFunc("/files/", func(w http.ResponseWriter, r *http.Request) {
@@ -115,9 +119,11 @@ func main() {
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/javascript/jscript.js", serveJS)
 	http.HandleFunc("/style/style.css", serveStyle)
+	//initializes web socket
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		websox(red, w, r)
 	})
+	//basic server params
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

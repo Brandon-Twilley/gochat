@@ -47,9 +47,9 @@ type Client struct {
 	send chan []byte
 }
 
-// readPump pumps messages from the websocket connection to the hub.
+// reader pumps messages from the websocket connection to the hub.
 //
-// The application runs readPump in a per-connection goroutine. The application
+// The application runs reader in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
 
@@ -132,7 +132,9 @@ func irccall(m *msg, c *Client) {
 	return
 }
 
-func (cli *Client) readPump() {
+// 	Each instance of this function is running for all clients connected
+// 	to the webserver.
+func (cli *Client) reader() {
 	defer func() {
 		cli.r.leaving_client <- cli
 		cli.conn.Close()
@@ -155,50 +157,40 @@ func (cli *Client) readPump() {
 
 		message = str_message
 		fmt.Println(string(message))
+		//send message read to redist
 		cli.r.broadcast <- message
 	}
 }
 
 // 	Each instance of this function is running for all clients connected
-// 	to the webserver.  This is the function that sends it to our recipient
-// 	client
-func (cli *Client) writePump() {
-	defer func() {
-		cli.conn.Close()
-	}()
-
+// 	to the webserver.
+func (cli *Client) writer() {
+	//retrieve message read from redist and determine if client is connected
 	for {
-
 		select {
 		case message, ok := <-cli.send:
 			cli.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
-				// The hub closed the channel.
+				// Channel closed.
 				cli.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-
 			w, err := cli.conn.NextWriter(websocket.TextMessage)
-
 			if err != nil {
 				return
 			}
-
 			w.Write(message)
-
 			// Add queued chat messages to the current websocket message.
 			n := len(cli.send)
 			for i := 0; i < n; i++ {
 				w.Write(newline)
 				w.Write(<-cli.send)
 			}
-
 			if err := w.Close(); err != nil {
 				return
 			}
 			//constantly pings our client to see if there still exists a connection.
 			//if there exists no connection, terminate.
-
 		}
 	}
 }
@@ -214,14 +206,14 @@ func websox(red *redist, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//	we create the client datatype to keep track of all our clients in
-	//	the system and store it in a map datatype.  This is so we can
-	//	propagate all our messages through to every client that's a recipient
+	//	the system and store it in a map.
 	c := &Client{r: red, conn: conn, send: make(chan []byte, 256)}
+
 	//	the initial name of our client is their IP address and socket.
 	//	They can change this if they use the /nick command.
 	c.name = c.conn.RemoteAddr().String()
 
-	c.r.new_client <- c
-	go c.writePump()
-	c.readPump()
+	red.new_client <- c
+	go c.writer()
+	c.reader()
 }
